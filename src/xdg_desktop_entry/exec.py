@@ -100,7 +100,10 @@ class ExecCommand:
                 return False
 
             for arg in self.arguments:
-                if arg.type == ArgumentType.LONG_FLAG and arg.value == "--enable-features":
+                if (
+                    arg.type == ArgumentType.LONG_FLAG
+                    and arg.value == "--enable-features"
+                ):
                     if arg.attached_value:
                         arg.attached_value = ",".join([*existing, *to_add])
                     else:
@@ -138,7 +141,10 @@ class ExecCommand:
 
         base = flag.split("=", 1)[0]
         for arg in list(self.arguments):
-            if arg.type in (ArgumentType.LONG_FLAG, ArgumentType.SHORT_FLAG) and arg.value == base:
+            if (
+                arg.type in (ArgumentType.LONG_FLAG, ArgumentType.SHORT_FLAG)
+                and arg.value == base
+            ):
                 self.arguments.remove(arg)
                 return True
         return False
@@ -183,7 +189,9 @@ def parse_exec(exec_string: str) -> ExecCommand:
 
 
 # --- public helpers ------------------------------------------------------
-def add_flags(exec_string: str, flags: Sequence[str], *, merge_enable_features: bool = True) -> tuple[str, bool]:
+def add_flags(
+    exec_string: str, flags: Sequence[str], *, merge_enable_features: bool = True
+) -> tuple[str, bool]:
     cmd = parse_exec(exec_string)
     changed = False
     for flag in flags:
@@ -225,7 +233,9 @@ def sync_flags(
     return str(cmd), changed
 
 
-def merge_flags(flags: Iterable[str], *, merge_enable_features: bool = True) -> list[str]:
+def merge_flags(
+    flags: Iterable[str], *, merge_enable_features: bool = True
+) -> list[str]:
     if not merge_enable_features:
         return list(dict.fromkeys(flags))
 
@@ -264,5 +274,3 @@ __all__ = [
     "format_flags",
     "parse_exec",
 ]
-
-

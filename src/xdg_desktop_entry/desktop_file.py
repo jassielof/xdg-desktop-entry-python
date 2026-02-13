@@ -29,7 +29,9 @@ def apply_flags_to_desktop_file(
     try:
         content = desktop_path.read_text()
     except (IOError, UnicodeDecodeError) as exc:
-        raise DesktopParseError(f"Cannot read desktop file {desktop_path}: {exc}") from exc
+        raise DesktopParseError(
+            f"Cannot read desktop file {desktop_path}: {exc}"
+        ) from exc
 
     shebang = None
     if content.startswith("#!"):
@@ -88,7 +90,9 @@ def sync_flags_to_desktop_file(
     try:
         content = source_path.read_text()
     except (IOError, UnicodeDecodeError) as exc:
-        raise DesktopParseError(f"Cannot read desktop file {source_path}: {exc}") from exc
+        raise DesktopParseError(
+            f"Cannot read desktop file {source_path}: {exc}"
+        ) from exc
 
     shebang = None
     if content.startswith("#!"):
@@ -124,7 +128,7 @@ def sync_flags_to_desktop_file(
         try:
             current_content = user_path.read_text().strip()
             any_modified = any_modified or (result.strip() != current_content)
-        except (IOError, UnicodeDecodeError):
+        except IOError, UnicodeDecodeError:
             any_modified = True
     else:
         any_modified = True
@@ -136,5 +140,3 @@ __all__ = [
     "apply_flags_to_desktop_file",
     "sync_flags_to_desktop_file",
 ]
-
-
