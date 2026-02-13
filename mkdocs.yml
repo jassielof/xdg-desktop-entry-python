@@ -4,6 +4,7 @@ repo_name: XDG Desktop Entry for Python
 repo_url: https://github.com/jassielof/xdg-desktop-entry-python
 
 theme:
+  name: material
   font:
     text: IBM Plex Sans
     code: IBM Plex Mono
