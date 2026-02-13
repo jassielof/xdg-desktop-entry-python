@@ -1,0 +1,3 @@
+[submodule "modules/pyxdg"]
+	path = modules/pyxdg
+	url = https://gitlab.freedesktop.org/xdg/pyxdg
