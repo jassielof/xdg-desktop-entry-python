@@ -1,17 +1,31 @@
+"""Utilities for parsing, validating, and mutating desktop-entry Exec commands."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum, auto
 import re
 import shlex
-from typing import Iterable, List, Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Literal
 
 
 class ExecParseError(ValueError):
     """Raised when an Exec command cannot be parsed."""
 
 
+@dataclass(slots=True, frozen=True)
+class ExecDiagnostic:
+    """Diagnostic emitted by Exec command validation."""
+
+    code: str
+    message: str
+    severity: Literal["error", "warning"] = "error"
+
+
 class ArgumentType(Enum):
+    """Token classification for parsed Exec command arguments."""
+
     EXECUTABLE = auto()
     LONG_FLAG = auto()  # --flag or --flag=value
     SHORT_FLAG = auto()  # -f or -f value
@@ -28,6 +42,7 @@ class ExecArgument:
     attached_value: str | None = None  # For --flag=value
 
     def __str__(self) -> str:
+        """Render the argument back to a shell-like string token."""
         if self.attached_value is not None:
             return f"{self.value}={self.attached_value}"
         return self.value
@@ -45,14 +60,16 @@ class ExecCommand:
     """Parsed Exec command preserving argument order."""
 
     executable: str
-    arguments: List[ExecArgument]
+    arguments: list[ExecArgument]
 
     def __str__(self) -> str:
+        """Render command and arguments into a single command string."""
         parts = [self.executable, *(str(arg) for arg in self.arguments)]
         return " ".join(parts)
 
     # --- queries ---------------------------------------------------------
     def has_flag(self, flag: str) -> bool:
+        """Return whether a short/long flag is present in arguments."""
         base = flag.split("=", 1)[0]
         return any(
             arg.type in (ArgumentType.LONG_FLAG, ArgumentType.SHORT_FLAG)
@@ -61,6 +78,7 @@ class ExecCommand:
         )
 
     def enable_features(self) -> list[str]:
+        """Return distinct values from all ``--enable-features=...`` flags."""
         feats: list[str] = []
         for arg in self.arguments:
             if arg.type == ArgumentType.LONG_FLAG and arg.value == "--enable-features":
@@ -71,6 +89,7 @@ class ExecCommand:
         return feats
 
     def flag_value(self, flag: str) -> str | None:
+        """Get attached or following value for a given short/long flag."""
         base = flag.split("=", 1)[0]
         for idx, arg in enumerate(self.arguments):
             if arg.type == ArgumentType.LONG_FLAG and arg.value == base:
@@ -152,9 +171,25 @@ class ExecCommand:
 
 # --- parsing helpers -----------------------------------------------------
 _FIELD_CODE_RE = re.compile(r"^%[a-zA-Z]$")
+_VALID_FIELD_CODES = {
+    "%f",
+    "%F",
+    "%u",
+    "%U",
+    "%d",
+    "%D",
+    "%n",
+    "%N",
+    "%i",
+    "%c",
+    "%k",
+    "%v",
+    "%m",
+}
 
 
 def _parse_single_argument(arg: str) -> ExecArgument:
+    """Convert one command token into a typed ``ExecArgument``."""
     if _FIELD_CODE_RE.match(arg):
         return ExecArgument(type=ArgumentType.FIELD_CODE, value=arg)
 
@@ -188,10 +223,90 @@ def parse_exec(exec_string: str) -> ExecCommand:
     return ExecCommand(executable=executable, arguments=parsed_args)
 
 
+def validate_exec(exec_string: str) -> list[ExecDiagnostic]:
+    """Validate an ``Exec`` command against Desktop Entry spec constraints."""
+    diagnostics: list[ExecDiagnostic] = []
+
+    if not exec_string.strip():
+        diagnostics.append(
+            ExecDiagnostic(code="empty_exec", message="Exec command cannot be empty")
+        )
+        return diagnostics
+
+    try:
+        parts = shlex.split(exec_string)
+    except ValueError as exc:
+        diagnostics.append(
+            ExecDiagnostic(
+                code="invalid_exec_quoting",
+                message=f"Invalid quoting in Exec command: {exc}",
+            )
+        )
+        return diagnostics
+
+    if not parts:
+        diagnostics.append(
+            ExecDiagnostic(code="empty_exec", message="Exec command cannot be empty")
+        )
+        return diagnostics
+
+    executable = parts[0]
+    if "=" in executable:
+        diagnostics.append(
+            ExecDiagnostic(
+                code="invalid_exec_executable",
+                message='Executable in Exec command must not contain "="',
+            )
+        )
+
+    file_open_codes = {"%f", "%F", "%u", "%U"}
+    seen_open_code: str | None = None
+
+    for arg in parts[1:]:
+        if arg == "%%":
+            continue
+
+        for match in re.finditer(r"%[A-Za-z]", arg):
+            code = match.group(0)
+            if code not in _VALID_FIELD_CODES:
+                diagnostics.append(
+                    ExecDiagnostic(
+                        code="invalid_exec_field_code",
+                        message=f"Unknown Exec field code: {code}",
+                    )
+                )
+                continue
+
+            if code in file_open_codes:
+                if seen_open_code is None:
+                    seen_open_code = code
+                elif seen_open_code != code:
+                    diagnostics.append(
+                        ExecDiagnostic(
+                            code="multiple_open_field_codes",
+                            message=(
+                                "Exec command may contain at most one of %f, %F, %u, %U"
+                            ),
+                        )
+                    )
+
+            if code in {"%d", "%D", "%n", "%N", "%v", "%m"}:
+                diagnostics.append(
+                    ExecDiagnostic(
+                        code="deprecated_exec_field_code",
+                        message=f"Deprecated Exec field code is used: {code}",
+                        severity="warning",
+                    )
+                )
+
+    return diagnostics
+
+
 # --- public helpers ------------------------------------------------------
 def add_flags(
     exec_string: str, flags: Sequence[str], *, merge_enable_features: bool = True
 ) -> tuple[str, bool]:
+    """Add flags to an Exec command while preserving command order semantics."""
     cmd = parse_exec(exec_string)
     changed = False
     for flag in flags:
@@ -201,6 +316,7 @@ def add_flags(
 
 
 def remove_flags(exec_string: str, flags: Sequence[str]) -> tuple[str, bool]:
+    """Remove flags from an Exec command if present."""
     cmd = parse_exec(exec_string)
     changed = False
     for flag in flags:
@@ -236,6 +352,7 @@ def sync_flags(
 def merge_flags(
     flags: Iterable[str], *, merge_enable_features: bool = True
 ) -> list[str]:
+    """Normalize and deduplicate a sequence of flags."""
     if not merge_enable_features:
         return list(dict.fromkeys(flags))
 
@@ -259,11 +376,13 @@ def merge_flags(
 
 
 def format_flags(flags: Iterable[str], *, merge_enable_features: bool = True) -> str:
+    """Format merged flags as a single space-delimited string."""
     return " ".join(merge_flags(flags, merge_enable_features=merge_enable_features))
 
 
 __all__ = [
     "ArgumentType",
+    "ExecDiagnostic",
     "ExecArgument",
     "ExecCommand",
     "ExecParseError",
@@ -273,4 +392,5 @@ __all__ = [
     "merge_flags",
     "format_flags",
     "parse_exec",
+    "validate_exec",
 ]
