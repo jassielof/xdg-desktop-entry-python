@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Terminal Application
-Exec=my-terminal-app
-Terminal=true
-Icon=utilities-terminal
-Categories=System;TerminalEmulator;
-Comment=A terminal-based application

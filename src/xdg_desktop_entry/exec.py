@@ -1,4 +1,6 @@
-"""Utilities for parsing, validating, and mutating desktop-entry Exec commands."""
+"""
+Utilities for parsing, validating, and mutating desktop-entry Exec commands.
+"""
 
 from __future__ import annotations
 
@@ -302,7 +304,6 @@ def validate_exec(exec_string: str) -> list[ExecDiagnostic]:
     return diagnostics
 
 
-# --- public helpers ------------------------------------------------------
 def add_flags(
     exec_string: str, flags: Sequence[str], *, merge_enable_features: bool = True
 ) -> tuple[str, bool]:

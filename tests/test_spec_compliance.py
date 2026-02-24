@@ -13,7 +13,7 @@ from xdg_desktop_entry import (
     validate_document,
 )
 
-FIXTURES_ROOT = Path(__file__).parent / "fixtures" / "fixtures"
+FIXTURES_ROOT = Path(__file__).parent / "fixtures"
 VALID_FIXTURES = FIXTURES_ROOT / "valid"
 INVALID_FIXTURES = FIXTURES_ROOT / "invalid"
 

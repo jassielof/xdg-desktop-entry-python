@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=DBus Activatable App
-DBusActivatable=true
-Icon=dbus-app
-Comment=An application launched via DBus
